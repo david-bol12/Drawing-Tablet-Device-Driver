@@ -1,0 +1,26 @@
+#JetBrains
+.idea
+compile_commands.json
+
+# Object files
+*.o
+.module-common.o
+
+# Temporary/editor files
+*~
+core
+
+# Dependency and build metadata
+.depend
+.*.cmd
+.modules.order
+modules.order
+*.symvers
+
+# Kernel module build artifacts
+*.ko
+*.mod.c
+*.mod
+.tmp_versions/
+
+# Misc build leftovers
