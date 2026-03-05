@@ -1,6 +1,7 @@
 #JetBrains
 .idea
 compile_commands.json
+compile_commands.filtered.json
 
 #VSCode
 .vscode
