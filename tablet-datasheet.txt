@@ -1,0 +1,20 @@
+Tablet is little endian
+
+Tablet has three USB interfaces
+
+Button input packets start with a 06 byte (as apposed to 07 for Pen input).
+The 2nd and 3rd bytes are the button codes.
+
+Button Codes: (Hex)
+1: 00 05
+2: 00 08
+3: 04 00
+4: 00 2c
+5: 00 19
+6: 01 16
+7: 01 1d
+8: 05 11
+9: 01 57
+10: 01 56
+
+Because each of the second bytes in the button codes are unique, the first byte can be ignored for ease of implementation.
