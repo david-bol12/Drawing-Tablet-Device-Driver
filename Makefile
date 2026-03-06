@@ -30,5 +30,5 @@ clean:
 
 else
     # called from kernel build system: just declare what our modules are
-    obj-m := tablet_driver.o
+    obj-m := cdev_controller.o
 endif

@@ -16,9 +16,30 @@ static struct class *tablet_class;
 static struct device *tablet_device;
 static struct cdev tablet_cdev;
 
+// tracks how many processes have the device open
+static int open_count = 0;
+
+static int tablet_open(struct inode *inode, struct file *file);
+static int tablet_release(struct inode *inode, struct file *file);
+
 static struct file_operations fops = {
     .owner = THIS_MODULE,
+    .open = tablet_open, 
+    .release = tablet_release,
 };
+
+static int tablet_open(struct inode *inode, struct file *file) {
+    open_count++;
+    printk(KERN_INFO "tablet: device opened (open count: %d)\n", open_count);
+    return 0;
+
+}
+
+static int tablet_release(struct inode *inode, struct file *file) {
+    open_count--;
+    printk(KERN_INFO "tablet: device closed (open count: %d)\n", open_count);
+    return 0;
+}
 
 static int __init tablet_init(void) {
 
