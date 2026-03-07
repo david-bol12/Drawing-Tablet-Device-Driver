@@ -7,6 +7,7 @@
 #include <linux/wait.h>        
 #include <linux/uaccess.h>
 #include "tablet.h"
+#include "cdev_controller.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Team 12");
@@ -180,7 +181,7 @@ int tablet_buffer_read(struct tablet_event *event) {
 }
 EXPORT_SYMBOL(tablet_buffer_read);
 
-static int __init tablet_init(void) {
+int tablet_init(void) {
 
     // Registers driver with kernel as character device
     major_number = register_chrdev(0, DEVICE_NAME, &fops);
@@ -212,14 +213,16 @@ static int __init tablet_init(void) {
     return 0;
 }
 
-static void __exit tablet_exit(void) {
+void tablet_exit(void) {
     device_destroy(tablet_class, MKDEV(major_number, 0));
     class_destroy(tablet_class);
     unregister_chrdev(major_number, DEVICE_NAME);
     printk(KERN_ALERT "tablet: /dev/tablet removed\n");
 }
 
-module_init(tablet_init);
-module_exit(tablet_exit);
+// Currently the module is mounted in the usb driver. Can be uncommented for testing but don't commit with it.
+
+// module_init(tablet_init);
+// module_exit(tablet_exit);
 
 
