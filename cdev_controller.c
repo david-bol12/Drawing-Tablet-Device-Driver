@@ -8,6 +8,9 @@
 #include <linux/uaccess.h>
 #include <linux/ioctl.h>
 #include <linux/input.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/atomic.h>
 #include "tablet.h"
 #include "cdev_controller.h"
 
@@ -26,6 +29,10 @@ static struct cdev tablet_cdev;
 
 // tracks how many processes have the device open
 static int open_count = 0;
+
+// stats counters - atomic so they're safe to increment from anywhere
+static atomic_t total_reads  = ATOMIC_INIT(0);
+static atomic_t total_writes = ATOMIC_INIT(0);
 
 // Circular buffer
 static struct tablet_event event_buffer[BUFFER_SIZE];
@@ -112,6 +119,7 @@ static ssize_t tablet_read(struct file *file, char __user *user_buf, size_t coun
         return -EFAULT;
     }
 
+    atomic_inc(&total_reads);
     return sizeof(event);
 }
 
@@ -145,9 +153,8 @@ static ssize_t tablet_write(struct file *file, const char __user *user_buf, size
 
     wake_up_interruptible(&read_queue);
 
+    atomic_inc(&total_writes);
     return sizeof(event);
-
-    
 }
 
 int tablet_buffer_write(struct tablet_event *event) {
@@ -277,6 +284,27 @@ static long tablet_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
     }
 }
 
+// /proc/tablet_stats — shows live driver statistics
+static int tablet_proc_show(struct seq_file *m, void *v) {
+    seq_printf(m, "total_reads:  %d\n", atomic_read(&total_reads));
+    seq_printf(m, "total_writes: %d\n", atomic_read(&total_writes));
+    mutex_lock(&tablet_mutex);
+    seq_printf(m, "buffer_count: %d\n", buf_count);
+    mutex_unlock(&tablet_mutex);
+    return 0;
+}
+
+static int tablet_proc_open(struct inode *inode, struct file *file) {
+    return single_open(file, tablet_proc_show, NULL);
+}
+
+static const struct proc_ops tablet_proc_ops = {
+    .proc_open    = tablet_proc_open,
+    .proc_read    = seq_read,
+    .proc_lseek   = seq_lseek,
+    .proc_release = single_release,
+};
+
 int tablet_init(void) {
     int i;
 
@@ -331,10 +359,15 @@ int tablet_init(void) {
     }
     printk(KERN_ALERT "tablet: /dev/tablet created\n");
 
+    // create /proc/tablet_stats
+    proc_create("tablet_stats", 0, NULL, &tablet_proc_ops);
+    printk(KERN_ALERT "tablet: /proc/tablet_stats created\n");
+
     return 0;
 }
 
 void tablet_exit(void) {
+    remove_proc_entry("tablet_stats", NULL);
     device_destroy(tablet_class, MKDEV(major_number, 0));
     class_destroy(tablet_class);
     unregister_chrdev(major_number, DEVICE_NAME);
