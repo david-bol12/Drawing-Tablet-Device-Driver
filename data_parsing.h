@@ -7,7 +7,7 @@
 
 struct button_array {
     short no_pressed;
-    char* buttons;
+    char buttons[7];
 };
 
 void get_buttons_pressed(unsigned char* data, u32 length, struct button_array* location);

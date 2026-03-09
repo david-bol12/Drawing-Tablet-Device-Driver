@@ -34,10 +34,9 @@ static void tablet_irq_callback(struct urb *urb)
 	if (urb->status == 0) {
 		printk(KERN_INFO "tablet data:");
 		if (dev->buf[0] == 6) {
-			char buttons[7];
 			struct button_array pressed = {
 				0,
-				buttons
+				{}
 			};
 			get_buttons_pressed(dev->buf, urb->actual_length, &pressed);
 			printk(KERN_ALERT "Button(s) ");

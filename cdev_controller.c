@@ -38,20 +38,20 @@ static DEFINE_MUTEX(tablet_mutex);
 static DECLARE_WAIT_QUEUE_HEAD(read_queue);
 static DECLARE_WAIT_QUEUE_HEAD(write_queue);
 
-static int tablet_open(struct inode *inode, struct file *file);
-static int tablet_release(struct inode *inode, struct file *file);
-static ssize_t tablet_read(struct file *file, char __user *user_buf, size_t count, loff_t *offset);
-static ssize_t tablet_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset);
+static int cdev_open(struct inode *inode, struct file *file);
+static int cdev_release(struct inode *inode, struct file *file);
+static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count, loff_t *offset);
+static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset);
 
 static struct file_operations fops = {
     .owner = THIS_MODULE,
-    .open = tablet_open, 
-    .release = tablet_release,
-    .read = tablet_read,
-    .write = tablet_write,
+    .open = cdev_open,
+    .release = cdev_release,
+    .read = cdev_read,
+    .write = cdev_write,
 };
 
-static int tablet_open(struct inode *inode, struct file *file) {
+static int cdev_open(struct inode *inode, struct file *file) {
     open_count++;
 
     if (open_count == 1) {
@@ -67,7 +67,7 @@ static int tablet_open(struct inode *inode, struct file *file) {
 
 }
 
-static int tablet_release(struct inode *inode, struct file *file) {
+static int cdev_release(struct inode *inode, struct file *file) {
     open_count--;
     // wake up sleeping readers so they don't sleep forever
     if (open_count == 0) {
@@ -78,7 +78,7 @@ static int tablet_release(struct inode *inode, struct file *file) {
     return 0;
 }
 
-static ssize_t tablet_read(struct file *file, char __user *user_buf, size_t count, loff_t *offset) {
+static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count, loff_t *offset) {
     struct tablet_event event;
 
     // check if userspace gave enough space for one event
@@ -111,7 +111,7 @@ static ssize_t tablet_read(struct file *file, char __user *user_buf, size_t coun
     return sizeof(event);
 }
 
-static ssize_t tablet_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset) {
+static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset) {
     struct tablet_event event;
 
 
@@ -146,7 +146,7 @@ static ssize_t tablet_write(struct file *file, const char __user *user_buf, size
     
 }
 
-int tablet_buffer_write(struct tablet_event *event) {
+int cdev_buffer_write(struct tablet_event *event) {
     if (buf_count >= BUFFER_SIZE) {
         printk(KERN_WARNING "tablet: buffer full, dropping event\n");
         return -1;
@@ -162,9 +162,9 @@ int tablet_buffer_write(struct tablet_event *event) {
 
     return 0;
 }
-EXPORT_SYMBOL(tablet_buffer_write);
+EXPORT_SYMBOL(cdev_buffer_write);
 
-int tablet_buffer_read(struct tablet_event *event) {
+int cdev_buffer_read(struct tablet_event *event) {
     if (buf_count == 0) {
         return -1;
     }
@@ -179,7 +179,7 @@ int tablet_buffer_read(struct tablet_event *event) {
 
     return 0;
 }
-EXPORT_SYMBOL(tablet_buffer_read);
+EXPORT_SYMBOL(cdev_buffer_read);
 
 int tablet_init(void) {
 
