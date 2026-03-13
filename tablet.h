@@ -1,11 +1,12 @@
 #ifndef TABLET_H
 #define TABLET_H
+#include "data_parsing.h"
 
 struct tablet_event {
     int x;
     int y;
     int pressure;
-    int button;     // button number 1-10, 0 = no button
+    struct button_array tab_buttons;     // button number 1-10, 0 = no button
     int pen_button;
 };
 

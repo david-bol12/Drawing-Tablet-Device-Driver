@@ -10,8 +10,9 @@
 
 #define MAX_BUTTONS 11
 static struct button_binding button_bindings[MAX_BUTTONS];
+static struct input_dev *tablet_input_dev;
 
-int void input_dev_init() {
+static int input_dev_init(void) {
 
     // Create virtual keyboard so we can inject keypresses into the OS
     tablet_input_dev = input_allocate_device();
