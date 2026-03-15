@@ -4,14 +4,12 @@
 #include <linux/usb.h>
 #include "data_parsing.h"
 #include "usb_driver.h"
+#include "cursor_control.h"
 
 #include "cdev_controller.h"
 #include "tablet.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-#define VENDOR_ID  0x28bd
-#define PRODUCT_ID 0x0937
 
 void handle_button_input(struct tablet_usb_dev *dev);
 void handle_pen_input(struct tablet_usb_dev *dev);
@@ -32,7 +30,7 @@ static void tablet_irq_callback(struct urb *urb)
 	if (urb->status == 0) {
 		if (dev->buf[0] == 6) { // Button Input
 			handle_button_input(dev);
-		} else if (dev->buf[0] == 7) {
+		} else if (dev->buf[0] == 7) { // Wacom: 10, Pen Input
 			handle_pen_input(dev);
 		}
 		// for (i = 0; i < urb->actual_length; i++)
@@ -111,8 +109,6 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 
 	usb_set_intfdata(interface, dev);
 
-	usb_submit_urb(dev->urb, GFP_KERNEL);
-
 	dev->input_dev = input_allocate_device();
 
 	if (!dev->input_dev) {
@@ -122,14 +118,13 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 	dev->input_dev->dev.parent = &interface->dev;
 	dev->input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 
-	// Absolute coordinate positioning for cursor control
-	input_set_abs_params(dev->input_dev, ABS_X, 0, 32767, 0, 0);
-	input_set_abs_params(dev->input_dev, ABS_Y, 0, 32767, 0, 0);
-	input_set_abs_params(dev->input_dev, ABS_PRESSURE, 0, 8191, 0, 0);
+	cursor_control_initialize(dev);
 
 	if (input_register_device(dev->input_dev)) {
 		goto error;
 	}
+
+	usb_submit_urb(dev->urb, GFP_KERNEL);
 
 	printk(KERN_ALERT "Raw tablet driver bound\n");
 	return 0;
@@ -148,6 +143,7 @@ static void tablet_disconnect(struct usb_interface *interface)
 
 	usb_kill_urb(dev->urb);
 	usb_free_urb(dev->urb);
+	input_unregister_device(dev->input_dev);
 	kfree(dev->buf);
 	usb_put_dev(dev->usb_dev);
 	kfree(dev);
@@ -199,11 +195,9 @@ void handle_pen_input(struct tablet_usb_dev *dev) {
 	}
 
 	printk(KERN_ALERT "Pen at X: %d, Y: %d", pen_loc.x, pen_loc.y);
-	// Report pen coordinates to input subsystem
-	// Can be added to own file/function if needed
-	input_report_abs(dev->input_dev, ABS_X, pen_loc.x);
-	input_report_abs(dev->input_dev, ABS_Y, pen_loc.y);
-	input_sync(dev->input_dev);
+
+	// Report pen coordinates
+	cursor_control_reporting(dev, dev->buf, pen_loc.x, pen_loc.y, 0);
 	
 }
     

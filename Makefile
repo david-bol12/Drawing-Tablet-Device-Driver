@@ -30,6 +30,6 @@ clean:
 
 else
     # called from kernel build system: just declare what our modules are
-    driver_mod-objs := data_parsing.o cdev_controller.o usb_driver.o
+    driver_mod-objs := data_parsing.o cdev_controller.o usb_driver.o cursor_control.o
     obj-m := driver_mod.o
 endif
