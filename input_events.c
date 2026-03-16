@@ -9,7 +9,8 @@
 #include <linux/kernel.h>
 
 #define MAX_BUTTONS 11
-static struct button_binding button_bindings[MAX_BUTTONS];
+struct button_binding button_bindings[MAX_BUTTONS];
+DEFINE_MUTEX(bindings_mutex);
 static struct input_dev *tablet_input_dev;
 
 static int input_dev_init(void) {

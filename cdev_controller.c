@@ -8,6 +8,7 @@
 #include <linux/uaccess.h>
 #include "tablet.h"
 #include "cdev_controller.h"
+#include "ioctl.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Team 12");
@@ -44,6 +45,7 @@ static struct file_operations fops = {
     .release = cdev_release,
     .read = cdev_read,
     .write = cdev_write,
+    .unlocked_ioctl = tablet_ioctl,
 };
 
 // A struct that contains unique data for each instance that is reading from the cdev
@@ -143,6 +145,18 @@ static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t
 
     
 }
+
+void cdev_buffer_clear(void) {
+    mutex_lock(&tablet_mutex);
+    memset(&event_buffer, 0, sizeof(event_buffer));
+    data_instance = 0;
+    buf_head = 0;
+    buf_tail = 0;
+    buf_count = 0;
+    mutex_unlock(&tablet_mutex);
+    printk(KERN_INFO "tablet: buffer cleared\n");
+}
+EXPORT_SYMBOL(cdev_buffer_clear);
 
 int cdev_buffer_write(struct tablet_event *event) {
 
