@@ -54,8 +54,8 @@ struct point get_pen_coordinates(unsigned char* data, unsigned int length) {
     x = data[3] << 8;
     x += data[2];
 
-    y = data[6] << 8;
-    y += data[5];
+    y = data[5] << 8;
+    y += data[4];
 
     struct point point = {
         x,

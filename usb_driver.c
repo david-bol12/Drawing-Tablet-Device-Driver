@@ -103,7 +103,7 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 		dev->buf,
 		dev->buf_size,
 		tablet_irq_callback,
-		dev,
+        dev,
 		endpoint->bInterval
 	);
 
