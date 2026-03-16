@@ -4,9 +4,9 @@
 #include <linux/usb.h>
 #include "data_parsing.h"
 #include "usb_driver.h"
-#include "cursor_control.h"
 
 #include "cdev_controller.h"
+#include "input_events.h"
 #include "tablet.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -33,11 +33,9 @@ static void tablet_irq_callback(struct urb *urb)
 		} else if (dev->buf[0] == 7) { // Wacom: 10, Pen Input
 			handle_pen_input(dev);
 		}
-		// for (i = 0; i < urb->actual_length; i++)
-		// 	printk(KERN_CONT " %02x", dev->buf[i]);
-		//
-		printk(KERN_CONT "\n");
-
+		for (int i = 0; i < urb->actual_length; i++)
+			printk(KERN_CONT " %02x", dev->buf[i]);
+		printk("\n");
 		cdev_buffer_write(dev->tablet_data);
 
 	}
@@ -118,7 +116,7 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 	dev->input_dev->dev.parent = &interface->dev;
 	dev->input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 
-	cursor_control_initialize(dev);
+	cursor_control_init(dev);
 
 	if (input_register_device(dev->input_dev)) {
 		goto error;
@@ -166,44 +164,10 @@ void handle_button_input(struct tablet_usb_dev *dev) {
 }
 
 void handle_pen_input(struct tablet_usb_dev *dev) {
-	struct point pen_loc = get_pen_coordinates(dev->buf, dev->urb->actual_length);
-	dev->tablet_data->x = pen_loc.x;
-	dev->tablet_data->y = pen_loc.y;
-	dev->tablet_data->pressure = get_pen_pressure(dev->buf, dev->urb->actual_length);
-	switch (dev->buf[1]) {
-		case 0xa0:
-		case 0xa1:
-			printk("No pen button pressed");
-			dev->tablet_data->pen_button = 0;
-			break;
-		case 0xa2:
-		case 0xa3:
-			printk("Pen button 1 pressed");
-			dev->tablet_data->pen_button = 1;
-			break;
-		case 0xa4:
-		case 0xa5:
-			printk("Pen Button 2 Pressed");
-			dev->tablet_data->pen_button = 2;
-			break;
-		default:
-			break;
-	}
-	
-	printk(KERN_ALERT "Button(s) ");
-	if (dev->tablet_data->tab_buttons.no_pressed == 0) {
-		printk(KERN_ALERT "Released \n");
-	} else {
-		for (int i = 0; i < dev->tablet_data->tab_buttons.no_pressed; i++) {
-			printk(KERN_ALERT "%d, ", dev->tablet_data->tab_buttons.buttons[i]);
-		}
-		printk(KERN_ALERT "Pressed \n");
-	}
 
-	printk(KERN_ALERT "Pen at X: %d, Y: %d", pen_loc.x, pen_loc.y);
-
+	update_pen_data(dev->buf, dev->urb->actual_length, dev->tablet_data);
 	// Report pen coordinates
-	cursor_control_reporting(dev, dev->buf, pen_loc.x, pen_loc.y, 0);
+	cursor_control_reporting(dev, *tablet_data, dev->tablet_data->pen_in_range);
 	
 }
     

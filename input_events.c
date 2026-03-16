@@ -8,7 +8,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-#define MAX_BUTTONS 11
 static struct button_binding button_bindings[MAX_BUTTONS];
 static struct input_dev *tablet_input_dev;
 
@@ -38,16 +37,16 @@ static int input_dev_init(void) {
     }
 
     // default button bindings - can be overridden at runtime via ioctl
-    button_bindings[1]  = (struct button_binding){ 1,  KEY_Z,         MOD_CTRL  };  // Ctrl+Z
-    button_bindings[2]  = (struct button_binding){ 2,  KEY_C,         MOD_CTRL  };  // Ctrl+C
-    button_bindings[3]  = (struct button_binding){ 3,  KEY_V,         MOD_CTRL  };  // Ctrl+V
-    button_bindings[4]  = (struct button_binding){ 4,  KEY_S,         MOD_CTRL  };  // Ctrl+S
-    button_bindings[5]  = (struct button_binding){ 5,  KEY_Y,         MOD_CTRL  };  // Ctrl+Y
-    button_bindings[6]  = (struct button_binding){ 6,  KEY_MINUS,     MOD_CTRL  };  // Ctrl+-
-    button_bindings[7]  = (struct button_binding){ 7,  KEY_EQUAL,     MOD_CTRL  };  // Ctrl+=  (zoom in)
-    button_bindings[8]  = (struct button_binding){ 8,  KEY_CAPSLOCK,  0         };  // Caps Lock
-    button_bindings[9]  = (struct button_binding){ 9,  KEY_VOLUMEUP,  0         };  // Volume Up
-    button_bindings[10] = (struct button_binding){ 10, KEY_VOLUMEDOWN,0         };  // Volume Down
+    button_bindings[1]  = (struct button_binding){KEY_Z,         MOD_CTRL  };  // Ctrl+Z
+    button_bindings[2]  = (struct button_binding){KEY_C,         MOD_CTRL  };  // Ctrl+C
+    button_bindings[3]  = (struct button_binding){KEY_V,         MOD_CTRL  };  // Ctrl+V
+    button_bindings[4]  = (struct button_binding){KEY_S,         MOD_CTRL  };  // Ctrl+S
+    button_bindings[5]  = (struct button_binding){KEY_Y,         MOD_CTRL  };  // Ctrl+Y
+    button_bindings[6]  = (struct button_binding){KEY_MINUS,     MOD_CTRL  };  // Ctrl+-
+    button_bindings[7]  = (struct button_binding){KEY_EQUAL,     MOD_CTRL  };  // Ctrl+=  (zoom in)
+    button_bindings[8]  = (struct button_binding){KEY_CAPSLOCK,  0         };  // Caps Lock
+    button_bindings[9]  = (struct button_binding){KEY_VOLUMEUP,  0         };  // Volume Up
+    button_bindings[10] = (struct button_binding){ KEY_VOLUMEDOWN,0         };  // Volume Down
 
     return 0;
 }
@@ -81,4 +80,59 @@ static void release_binding(struct button_binding *b) {
         input_report_key(tablet_input_dev, KEY_LEFTSHIFT, 0);
 
     input_sync(tablet_input_dev);
+}
+
+#define TABLET_RES_X 200
+#define TABLET_RES_Y 200
+
+
+//TODO: remove unnecessary buffer
+void cursor_control_reporting(struct tablet_usb_dev *dev, struct tablet_event tab_data, int pen_in_range) {
+
+    // I'm not 100% sure of the bit layout of the pen input data, so I've hard coded these values for now.
+    // The local variables will be moved to data_parasing.c and populated based on the data received from the tablet in the future.
+    // For now I just have it hard coded for testing, modularity can come afterwards.
+    // - Ollie
+
+    if (pen_in_range) {
+        printk(KERN_ALERT "Pen in range");
+        input_report_abs(dev->input_dev, ABS_X,        tab_data.x);
+        input_report_abs(dev->input_dev, ABS_Y,        tab_data.y);
+        input_report_abs(dev->input_dev, ABS_PRESSURE, tab_data.pressure);
+
+        input_report_key(dev->input_dev, BTN_TOUCH,   tab_data.pressure);
+        input_report_key(dev->input_dev, BTN_STYLUS,  tab_data.pen_button  == 1);
+        input_report_key(dev->input_dev, BTN_STYLUS2, tab_data.pen_button == 2);
+        input_report_key(dev->input_dev, BTN_TOOL_PEN, 1);
+    } else {
+        input_report_key(dev->input_dev, BTN_TOOL_PEN, 0);
+        input_report_key(dev->input_dev, BTN_TOUCH,    0);
+    }
+
+    input_sync(dev->input_dev);
+}
+
+void cursor_control_init(struct tablet_usb_dev *dev) {
+
+    dev->input_dev->name = "Custom Tablet";
+    usb_make_path(dev->usb_dev, dev->phys, sizeof(dev->phys));
+    dev->input_dev->phys = dev->phys;
+    dev->input_dev->dev.parent = &dev->interface->dev;
+
+    // Absolute axes
+    input_set_abs_params(dev->input_dev, ABS_X,        0, TABLET_MAX_X,        4, 0);
+    input_set_abs_params(dev->input_dev, ABS_Y,        0, TABLET_MAX_Y,        4, 0);
+    input_set_abs_params(dev->input_dev, ABS_PRESSURE, 0, TABLET_MAX_PRESSURE, 0, 0);
+
+    input_abs_set_res(dev->input_dev, ABS_X, TABLET_RES_X);
+    input_abs_set_res(dev->input_dev, ABS_Y, TABLET_RES_Y);
+
+    // Pen buttons and touch
+    __set_bit(BTN_TOUCH,    dev->input_dev->keybit);
+    __set_bit(BTN_STYLUS,   dev->input_dev->keybit);
+    __set_bit(BTN_STYLUS2,  dev->input_dev->keybit);
+    __set_bit(BTN_TOOL_PEN, dev->input_dev->keybit);
+
+    input_set_drvdata(dev->input_dev, dev);
+
 }

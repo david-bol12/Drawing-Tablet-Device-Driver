@@ -4,7 +4,7 @@
 #include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/mutex.h>
-#include <linux/wait.h>        
+#include <linux/wait.h>
 #include <linux/uaccess.h>
 #include "tablet.h"
 #include "cdev_controller.h"
@@ -216,10 +216,5 @@ void tablet_cdev_cleanup(void) {
     unregister_chrdev(major_number, DEVICE_NAME);
     printk(KERN_ALERT "tablet: /dev/tablet removed\n");
 }
-
-// Currently the module is mounted in the usb driver. Can be uncommented for testing but don't commit with it.
-
-// module_init(tablet_init);
-// module_exit(tablet_exit);
 
 
