@@ -5,20 +5,10 @@
 #ifndef DEVICEDRIVERPROJECT_DATA_PARSING_H
 #define DEVICEDRIVERPROJECT_DATA_PARSING_H
 
-struct button_array {
-    short no_pressed;
-    char buttons[7];
-};
-
-struct point {
-    unsigned short x;
-    unsigned short y;
-};
+#include "tablet.h"
 
 void get_buttons_pressed(unsigned char* data, unsigned int length, struct button_array* location);
 
-struct point get_pen_coordinates(unsigned char* data, unsigned int length);
-
-short get_pen_pressure(unsigned char* data, unsigned int length);
+void update_pen_data(unsigned char* buf, unsigned int length, struct tablet_event *tablet_data);
 
 #endif //DEVICEDRIVERPROJECT_DATA_PARSING_H

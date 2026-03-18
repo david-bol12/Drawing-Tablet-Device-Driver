@@ -1,6 +1,14 @@
 #ifndef TABLET_H
 #define TABLET_H
-#include "data_parsing.h"
+
+#define MAX_BUTTONS 10
+#define BUTTON_INTERFACE 0
+#define PEN_INTERFACE 1
+
+struct button_array {
+    short no_pressed;
+    char buttons[7];
+};
 
 struct tablet_event {
     int x;
@@ -12,9 +20,15 @@ struct tablet_event {
 };
 
 struct button_binding {
-    int button_id;  // 1-10
     int keycode;    // Linux keycode e.g. KEY_Z
     int modifiers;  // bitmask: 1=Ctrl, 2=Alt, 4=Shift
+};
+
+struct tablet_settings {
+    int maxX;
+    int maxY;
+    struct button_binding tab_bindings[MAX_BUTTONS];
+    int toggle_bindings;
 };
 
 // unique identifier character

@@ -5,6 +5,8 @@
 #include <linux/usb.h>
 #include "data_parsing.h"
 
+#include "tablet.h"
+
 MODULE_LICENSE("Dual BSD/GPL");
 
 static char get_button_val(unsigned char code) {
@@ -47,29 +49,22 @@ void get_buttons_pressed(unsigned char* data, unsigned int length, struct button
     }
 }
 
-struct point get_pen_coordinates(unsigned char* data, unsigned int length) {
-    unsigned short x = 0;
-    unsigned short y = 0;
+void update_pen_data(unsigned char* buf, unsigned int length, struct tablet_event *tablet_data) {
 
-    x = data[3] << 8;
-    x += data[2];
+    tablet_data->pressure = buf[7] << 8;
+    tablet_data->pressure += buf[6];
 
-    y = data[5] << 8;
-    y += data[4];
+    tablet_data->x = buf[3] << 8;
+    tablet_data->x += buf[2];
 
-    struct point point = {
-        x,
-        y
-    };
+    tablet_data->y = buf[5] << 8;
+    tablet_data->y += buf[4];
 
-    return point;
-}
+    tablet_data->pen_in_range = buf[1] != 0xc0;
 
-short get_pen_pressure(unsigned char* data, unsigned int length) {
-    unsigned short pressure = 0;
-
-    pressure = data[7] << 8;
-    pressure += data[6];
-
-    return pressure;
+    if (buf[1] & 2) {
+        tablet_data->pen_button = 1;
+    } else if (buf[1] & 4) {
+        tablet_data->pen_button = 2;
+    }
 }

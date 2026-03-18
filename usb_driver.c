@@ -1,16 +1,15 @@
 #include <linux/init.h>
+#include <linux/input.h>
 #include <linux/module.h>
 #include <linux/usb.h>
 #include "data_parsing.h"
 #include "usb_driver.h"
 
 #include "cdev_controller.h"
+#include "input_events.h"
 #include "tablet.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
-
-#define VENDOR_ID  0x28bd
-#define PRODUCT_ID 0x0937
 
 void handle_button_input(struct tablet_usb_dev *dev);
 void handle_pen_input(struct tablet_usb_dev *dev);
@@ -31,14 +30,12 @@ static void tablet_irq_callback(struct urb *urb)
 	if (urb->status == 0) {
 		if (dev->buf[0] == 6) { // Button Input
 			handle_button_input(dev);
-		} else if (dev->buf[0] == 7) {
+		} else if (dev->buf[0] == 7) { // Wacom: 10, Pen Input
 			handle_pen_input(dev);
 		}
-		// for (i = 0; i < urb->actual_length; i++)
-		// 	printk(KERN_CONT " %02x", dev->buf[i]);
-		//
-		printk(KERN_CONT "\n");
-
+		for (int i = 0; i < urb->actual_length; i++)
+			printk(KERN_CONT " %02x", dev->buf[i]);
+		printk("\n");
 		cdev_buffer_write(dev->tablet_data);
 
 	}
@@ -75,9 +72,6 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 
 	dev->interface = interface;
 
-	// Find interrupt IN endpoint
-	printk(KERN_ALERT "%d", interface_desc->desc.bNumEndpoints);
-
 	for (int i = 0; i < interface_desc->desc.bNumEndpoints; i++) {
 		endpoint = &interface_desc->endpoint[i].desc;
 
@@ -104,11 +98,34 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 		dev->buf,
 		dev->buf_size,
 		tablet_irq_callback,
-		dev,
+        dev,
 		endpoint->bInterval
 	);
 
 	usb_set_intfdata(interface, dev);
+
+	switch (interface_desc->desc.bInterfaceNumber) {
+		case PEN_INTERFACE:
+			dev->pen_input_dev = input_allocate_device();
+			dev->pen_input_dev->dev.parent = &interface->dev;
+			cursor_control_init(dev);
+			if (input_register_device(dev->pen_input_dev)) {
+				goto error;
+			}
+			if (!dev->pen_input_dev) {
+				goto error;
+			}
+			break;
+		case BUTTON_INTERFACE:
+			dev->button_input_dev = input_allocate_device();
+			if (button_dev_init(dev->button_input_dev)) {
+				goto error;
+			}
+			if (!dev->button_input_dev) {
+				goto error;
+			}
+			break;
+	}
 
 	usb_submit_urb(dev->urb, GFP_KERNEL);
 
@@ -125,10 +142,17 @@ static void tablet_disconnect(struct usb_interface *interface)
 {
 	struct tablet_usb_dev *dev = usb_get_intfdata(interface);
 
-	tablet_cdev_cleanup();
 
 	usb_kill_urb(dev->urb);
 	usb_free_urb(dev->urb);
+	switch (dev->interface->minor) {
+		case PEN_INTERFACE:
+			input_unregister_device(dev->pen_input_dev);
+			break;
+		case BUTTON_INTERFACE:
+			input_unregister_device(dev->button_input_dev);
+			break;
+	}
 	kfree(dev->buf);
 	usb_put_dev(dev->usb_dev);
 	kfree(dev);
@@ -148,43 +172,17 @@ void handle_button_input(struct tablet_usb_dev *dev) {
 		}
 		printk(KERN_ALERT "Pressed \n");
 	}
+	update_button_states(&dev->tablet_data->tab_buttons, dev->button_input_dev);
 }
 
 void handle_pen_input(struct tablet_usb_dev *dev) {
-	struct point pen_loc = get_pen_coordinates(dev->buf, dev->urb->actual_length);
-	dev->tablet_data->x = pen_loc.x;
-	dev->tablet_data->y = pen_loc.y;
-	dev->tablet_data->pressure = get_pen_pressure(dev->buf, dev->urb->actual_length);
-	switch (dev->buf[1]) {
-		case 0xa0:
-		case 0xa1:
-			printk("No pen button pressed");
-			dev->tablet_data->pen_button = 0;
-			break;
-		case 0xa2:
-		case 0xa3:
-			printk("Pen button 1 pressed");
-			dev->tablet_data->pen_button = 1;
-			break;
-		case 0xa4:
-		case 0xa5:
-			printk("Pen Button 2 Pressed");
-			dev->tablet_data->pen_button = 2;
-			break;
-		default:
-			break;
-	}
-	printk(KERN_ALERT "Pen at X: %d, Y: %d", pen_loc.x, pen_loc.y);
-	printk(KERN_ALERT "Button(s) ");
-	if (dev->tablet_data->tab_buttons.no_pressed == 0) {
-		printk(KERN_ALERT "Released \n");
-	} else {
-		for (int i = 0; i < dev->tablet_data->tab_buttons.no_pressed; i++) {
-			printk(KERN_ALERT "%d, ", dev->tablet_data->tab_buttons.buttons[i]);
-		}
-		printk(KERN_ALERT "Pressed \n");
-	}
+
+	update_pen_data(dev->buf, dev->urb->actual_length, dev->tablet_data);
+	// Report pen coordinates
+	cursor_control_reporting(dev, *tablet_data, dev->tablet_data->pen_in_range);
+	
 }
+    
 
 static struct usb_driver tablet_usb_driver = {
 	.name = "custom_tablet_driver",
