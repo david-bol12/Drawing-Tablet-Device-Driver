@@ -28,6 +28,7 @@ struct tablet_settings {
     int maxX;
     int maxY;
     struct button_binding tab_bindings[MAX_BUTTONS];
+    int toggle_bindings;
 };
 
 // unique identifier character
