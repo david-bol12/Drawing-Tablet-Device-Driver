@@ -8,6 +8,7 @@
 #include <linux/uaccess.h>
 #include "tablet.h"
 #include "cdev_controller.h"
+#include "proc_file_controller.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Team 12");
@@ -21,16 +22,16 @@ static struct class *tablet_class;
 static struct device *tablet_device;
 
 // tracks how many processes have the device open
-static int open_count = 0;
+ int open_count = 0;
 
 static long data_instance = 0;
 
 // Event slot
-static struct tablet_event event_buffer;
+struct tablet_event event_buffer;
 
 
 // Initiialise mutex for buffer
-static DEFINE_MUTEX(tablet_mutex);
+DEFINE_MUTEX(tablet_mutex);
 
 // Initialise wait queue - processes waiting for a new data_instance
 static DECLARE_WAIT_QUEUE_HEAD(read_queue);
@@ -47,6 +48,11 @@ static struct file_operations fops = {
     .read = cdev_read,
     .write = cdev_write,
 };
+
+//for proc/ file
+int total_reads = 0;
+int total_writes = 0;
+
 
 // A struct that contains unique data for each instance that is reading from the cdev
 
@@ -99,6 +105,7 @@ static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count,
     mutex_lock(&tablet_mutex);
     event = event_buffer;
     reader_data->instance_no = data_instance;
+    total_reads++;
     mutex_unlock(&tablet_mutex);
 
 
@@ -144,6 +151,7 @@ int cdev_buffer_write(struct tablet_event *event) {
     mutex_lock(&tablet_mutex);
     event_buffer = *event;
     data_instance++;
+    total_writes++;
     mutex_unlock(&tablet_mutex);
 
     wake_up_interruptible(&read_queue);
@@ -191,10 +199,18 @@ int tablet_cdev_init(void) {
     }
     printk(KERN_ALERT "tablet: /dev/tablet created\n");
 
+    if (proc_init() != 0) {
+        device_destroy(tablet_class, MKDEV(major_number, 0));
+        class_destroy(tablet_class);
+        unregister_chrdev(major_number, DEVICE_NAME);
+        return -ENOMEM;
+    }
+
     return 0;
 }
 
 void tablet_cdev_cleanup(void) {
+    proc_exit();
     device_destroy(tablet_class, MKDEV(major_number, 0));
     class_destroy(tablet_class);
     unregister_chrdev(major_number, DEVICE_NAME);
