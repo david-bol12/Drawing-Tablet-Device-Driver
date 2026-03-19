@@ -11,9 +11,7 @@
 #define TABLET_RES_X 200
 #define TABLET_RES_Y 200
 
-static struct button_binding button_bindings[MAX_BUTTONS];
-
-int button_dev_init(struct input_dev *button_input_dev, struct tablet_settings *tablet_settings) {
+int button_dev_init(struct input_dev *button_input_dev) {
 
     // Create virtual keyboard so we can inject keypresses into the OS
     if (!button_input_dev) {
@@ -38,23 +36,27 @@ int button_dev_init(struct input_dev *button_input_dev, struct tablet_settings *
     }
 
     // default button bindings - can be overridden at runtime via ioctl
-    button_bindings[0] = (struct button_binding){ KEY_VOLUMEDOWN,0         };  // Volume Down
-    button_bindings[1]  = (struct button_binding){KEY_Z,         MOD_CTRL  };  // Ctrl+Z
-    button_bindings[2]  = (struct button_binding){KEY_C,         MOD_CTRL  };  // Ctrl+C
-    button_bindings[3]  = (struct button_binding){KEY_V,         MOD_CTRL  };  // Ctrl+V
-    button_bindings[4]  = (struct button_binding){KEY_S,         MOD_CTRL  };  // Ctrl+S
-    button_bindings[5]  = (struct button_binding){KEY_Y,         MOD_CTRL  };  // Ctrl+Y
-    button_bindings[6]  = (struct button_binding){KEY_MINUS,     MOD_CTRL  };  // Ctrl+-
-    button_bindings[7]  = (struct button_binding){KEY_EQUAL,     MOD_CTRL  };  // Ctrl+=  (zoom in)
-    button_bindings[8]  = (struct button_binding){KEY_CAPSLOCK,  0         };  // Caps Lock
-    button_bindings[9]  = (struct button_binding){KEY_VOLUMEUP,  0         };  // Volume Up
+    tablet_settings->tab_bindings[0] = (struct button_binding){ 1, KEY_VOLUMEDOWN,0         };  // Volume Down
+    tablet_settings->tab_bindings[1]  = (struct button_binding){2, KEY_Z,         MOD_CTRL  };  // Ctrl+Z
+    tablet_settings->tab_bindings[2]  = (struct button_binding){3, KEY_C,         MOD_CTRL  };  // Ctrl+C
+    tablet_settings->tab_bindings[3]  = (struct button_binding){4, KEY_V,         MOD_CTRL  };  // Ctrl+V
+    tablet_settings->tab_bindings[4]  = (struct button_binding){5, KEY_S,         MOD_CTRL  };  // Ctrl+S
+    tablet_settings->tab_bindings[5]  = (struct button_binding){6, KEY_Y,         MOD_CTRL  };  // Ctrl+Y
+    tablet_settings->tab_bindings[6]  = (struct button_binding){7, KEY_MINUS,     MOD_CTRL  };  // Ctrl+-
+    tablet_settings->tab_bindings[7]  = (struct button_binding){8, KEY_EQUAL,     MOD_CTRL  };  // Ctrl+=  (zoom in)
+    tablet_settings->tab_bindings[8]  = (struct button_binding){9, KEY_CAPSLOCK,  0         };  // Caps Lock
+    tablet_settings->tab_bindings[9]  = (struct button_binding){10, KEY_VOLUMEUP,  0         };  // Volume Up
 
     return 0;
 }
 
 static void press_binding(struct button_binding *b, struct input_dev *button_input_dev) {
-    if (!button_input_dev || b->keycode == 0)
+    if (!button_input_dev || b->keycode == 0) {
+        pr_alert("Keycode: ");
         return;
+    }
+
+    printk(KERN_ALERT "Binding pressed: %d", b->keycode);
 
     // press modifiers
     if (b->modifiers & MOD_CTRL)
@@ -84,11 +86,11 @@ static void release_binding(struct button_binding *b, struct input_dev *button_i
 void update_button_states(struct button_array *buttons_pressed, struct input_dev *button_input_dev) {
 
     for (int i = 0; i < MAX_BUTTONS; i++) {
-        release_binding(&button_bindings[i], button_input_dev);
+        release_binding(&tablet_settings->tab_bindings[i], button_input_dev);
     }
 
     for (int i = 0; i < buttons_pressed->no_pressed; i++) {
-        press_binding(&button_bindings[buttons_pressed->buttons[i] - 1], button_input_dev);
+        press_binding(&tablet_settings->tab_bindings[i], button_input_dev);
         pr_alert("button %d",i+1);
     }
 

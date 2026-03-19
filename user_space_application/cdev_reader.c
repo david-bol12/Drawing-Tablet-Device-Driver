@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 
@@ -21,17 +22,24 @@ void get_tablet_event(int fd, struct tablet_event* event_buf) {
 
 void do_ioctl(int fd) {
     struct button_binding binding = {
-        0,
-        4,
-        4
+        1,
+        115,
+        0
     };
     ioctl(fd, TABLET_SET_BINDING, &binding);
+    printf("\n ioctl done \n");
 }
 
-void* cdev_read(void* event_buf) {
-    int fd = init_reader();
-    do_ioctl(fd);
+void get_settings(int fd, struct tablet_settings *tablet_settings) {
+    ioctl(fd, TABLET_GET_SETTING, tablet_settings);
+    printf("ran");
+    printf("\n Keycode: %d \n", tablet_settings->tab_bindings[0].keycode);
+}
+
+void* cdev_read(void* reader_args) {
+    struct reader_args *args = reader_args;
+    int fd = args->fd;
     while (1) {
-        get_tablet_event(fd, event_buf);
+        get_tablet_event(fd, args->event_buf);
     }
 }

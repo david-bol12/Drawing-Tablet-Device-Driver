@@ -62,7 +62,6 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 	dev->usb_dev = usb_get_dev(interface_to_usbdev(interface));
 
 	dev->tablet_data = tablet_data;
-	dev->tablet_settings = tablet_settings;
 
 	/*
 	 The tablet actually has three interfaces each having an int in endpoint and the third also having an int out endpoint.
@@ -117,10 +116,9 @@ static int tablet_probe(struct usb_interface *interface, const struct usb_device
 			if (!dev->pen_input_dev) {
 				goto error;
 			}
-			break;
 		case BUTTON_INTERFACE:
 			dev->button_input_dev = input_allocate_device();
-			if (button_dev_init(dev->button_input_dev, dev->tablet_settings)) {
+			if (button_dev_init(dev->button_input_dev)) {
 				goto error;
 			}
 			if (!dev->button_input_dev) {

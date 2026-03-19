@@ -93,9 +93,9 @@ const char *RayKeyToString(int key, bool shift)
     }
 }
 
-char getModifiers() {
+int getModifiers() {
 
-    char modifiers = 0;
+    int modifiers = 0;
 
     bool ctrl  = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
     bool shift = IsKeyDown(KEY_LEFT_SHIFT)   || IsKeyDown(KEY_RIGHT_SHIFT);
@@ -114,14 +114,14 @@ char getModifiers() {
     return modifiers;
 }
 
-const char *GetKeyCombo(int key)
+const char *GetKeyCombo(int key, int modifiers)
 {
 
     if (key == 0) return NULL;
 
-    bool ctrl  = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
-    bool shift = IsKeyDown(KEY_LEFT_SHIFT)   || IsKeyDown(KEY_RIGHT_SHIFT);
-    bool alt   = IsKeyDown(KEY_LEFT_ALT)     || IsKeyDown(KEY_RIGHT_ALT);
+    bool ctrl  = modifiers & MOD_CTRL;
+    bool shift = modifiers & MOD_SHIFT;
+    bool alt   = modifiers & MOD_ALT;
 
     // Build modifier prefix
     static char combo[64] = {0};

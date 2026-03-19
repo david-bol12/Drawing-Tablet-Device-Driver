@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 const char *RayKeyToString(int key, bool shift);
-const char *GetKeyCombo(int key);
+const char *GetKeyCombo(int key, int modifiers);
+int LinuxKeyToRaylib(int linuxKey);
 
 #endif //DEVICEDRIVERAPP_KEY_CONVERTER_H

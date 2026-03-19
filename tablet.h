@@ -32,6 +32,9 @@ struct tablet_settings {
     int toggle_bindings;
 };
 
+extern struct tablet_settings *tablet_settings;
+
+
 // unique identifier character
 #define TABLET_MAGIC      'T'
 // sends a button_binding struct to driver to register new mapping (FOR GUI)

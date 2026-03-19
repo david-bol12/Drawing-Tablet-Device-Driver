@@ -19,28 +19,41 @@
 
 #define MAIN_FONTSIZE 25
 
+struct tablet_settings *tablet_settings;
+
 void draw1 (void) {
 
 }
 
-void drawTabBindingMenu(int x, int y, int button_no) {
+void drawTabBindingMenu(int x, int y, struct button_binding binding) {
+
+
+
     const static char* str = "None";
     static char combo[64] = "None";
-    int key = GetKeyPressed();
+    int key = LinuxKeyToRaylib(binding.keycode);
     if (key != 0)
     {
-        str = GetKeyCombo(key);
+        str = GetKeyCombo(key, binding.modifiers);
     }
 
 
     if (str != NULL) {
         TextCopy(combo, TextFormat("%s", str));
     }
-    DrawText(TextFormat("Tablet Button %d: %s", button_no, str), x, y, MAIN_FONTSIZE, BLACK);
+    DrawText(TextFormat("Tablet Button %d: %s", binding.button_id, str), x, y, MAIN_FONTSIZE, BLACK);
+    if (GuiButton((Rectangle) {500, y, 100, 25}, "Click")) {
+        printf("CLicked me! \n");
+        fflush(stdout); 
+    }
 }
 
-void draw2 (void* tab_data) {
-    drawTabBindingMenu(100, 100, 1);
+void draw2 () {
+    int y = 110;
+    for (int i = 0; i < MAX_BUTTONS; i++) {
+        drawTabBindingMenu(80, y, tablet_settings->tab_bindings[i]);
+        y += 30;
+    }
 }
 
 
@@ -87,9 +100,20 @@ int main(void)
     const int screenHeight = 800;
 
     struct tablet_event *event_buf = malloc(sizeof(struct tablet_event));
+    tablet_settings = malloc(sizeof(struct tablet_settings));
+
+    int fd = init_reader();
+
+    struct reader_args reader_args = {
+        event_buf,
+        tablet_settings,
+        fd
+    };
+
+    get_settings(fd, tablet_settings);
 
     pthread_t cdev_reader;
-    pthread_create(&cdev_reader, NULL, cdev_read, event_buf);
+    pthread_create(&cdev_reader, NULL, cdev_read, &reader_args);
 
     InitWindow(screenWidth, screenHeight, "Raylib Keyboard Input");
     SetWindowState(FLAG_WINDOW_MAXIMIZED);
@@ -118,7 +142,6 @@ int main(void)
     while (!WindowShouldClose())
     {
 
-        UpdateTabBar(&tb);
 
         // drawTabBindingMenu(80, 120, 1);
 
@@ -130,6 +153,7 @@ int main(void)
 
 
         BeginDrawing();
+        UpdateTabBar(&tb);
         DrawTabBar(&tb);
         ClearBackground(RAYWHITE);
         // DrawText(TextFormat("Keys: %d", event_buf->x), 100, 200, 30, DARKGRAY);

@@ -9,6 +9,7 @@
 #include "tablet.h"
 #include "cdev_controller.h"
 #include "ioctl.h"
+#include "../../../usr/src/linux-headers-6.17.0-14-generic/include/uapi/linux/input-event-codes.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Team 12");
@@ -28,7 +29,6 @@ static long data_instance = 0;
 
 // Circular buffer
 static struct tablet_event event_buffer;
-static struct tablet_settings *settings_buffer;
 static int buf_head = 0;
 static int buf_tail = 0;
 static int buf_count = 0;
@@ -193,8 +193,6 @@ EXPORT_SYMBOL(cdev_buffer_read);
 
 int tablet_cdev_init(struct tablet_settings *tablet_settings) {
 
-    settings_buffer = tablet_settings;
-
     // Initialise buffer
         buf_head = 0;
         buf_tail = 0;
@@ -239,18 +237,19 @@ void tablet_cdev_cleanup(void) {
 }
 
 long tablet_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
-    struct button_binding binding;
-
     switch (cmd) {
 
         case TABLET_SET_BINDING:
+            struct button_binding binding;
             if (copy_from_user(&binding, (void __user *)arg, sizeof(binding)))
                 return -EFAULT;
-            settings_buffer->tab_bindings[binding.button_id] = binding;
+            tablet_settings->tab_bindings[binding.button_id -1] = binding;
             return 0;
-
         case TABLET_GET_SETTING:
-
+            if (copy_to_user((void __user*) arg, tablet_settings, sizeof(struct tablet_settings))) {
+                pr_alert("\n Error \n");
+                return -EFAULT;
+            }
             return 0;
 
         case TABLET_CLR_BINDINGS:
