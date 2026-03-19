@@ -25,18 +25,20 @@ static int open_count = 0;
 
 static long data_instance = 0;
 
-// Circular buffer
+// Event slot
 static struct tablet_event event_buffer;
-static int buf_head = 0;
-static int buf_tail = 0;
-static int buf_count = 0;
+
 
 // Initiialise mutex for buffer
 static DEFINE_MUTEX(tablet_mutex);
 
-// Initialise wait queue - processes sleep here when buffer is empty
+// Initialise wait queue - processes waiting for a new data_instance
 static DECLARE_WAIT_QUEUE_HEAD(read_queue);
-static DECLARE_WAIT_QUEUE_HEAD(write_queue);
+
+static int cdev_open(struct inode *inode, struct file *file);
+static int cdev_release(struct inode *inode, struct file *file);
+static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count, loff_t *offset);
+static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset);
 
 static struct file_operations fops = {
     .owner = THIS_MODULE,
@@ -48,7 +50,7 @@ static struct file_operations fops = {
 
 // A struct that contains unique data for each instance that is reading from the cdev
 
-static struct reader_data {
+struct reader_data {
     unsigned long instance_no;
 };
 
@@ -69,7 +71,6 @@ static int cdev_release(struct inode *inode, struct file *file) {
     // wake up sleeping readers so they don't sleep forever
     if (open_count == 0) {
         wake_up_interruptible(&read_queue);
-        wake_up_interruptible(&write_queue);
     }
 
     kfree(file->private_data);
@@ -94,12 +95,12 @@ static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count,
         return -ERESTARTSYS;
     }
 
+
     mutex_lock(&tablet_mutex);
     event = event_buffer;
     reader_data->instance_no = data_instance;
     mutex_unlock(&tablet_mutex);
 
-    wake_up_interruptible(&write_queue);
 
     if (copy_to_user(user_buf, &event, sizeof(event))) {
         return -EFAULT;
@@ -107,8 +108,6 @@ static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count,
 
     return sizeof(event);
 }
-
-//TODO: Fix cdev write. Currently not working
 
 
 static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset) {
@@ -125,16 +124,12 @@ static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t
         return -EFAULT;
     }
 
-    if (wait_event_interruptible(write_queue, buf_count || open_count == 0)) {
-        return -ERESTARTSYS;
-    }
-
-    if (open_count == 0) {
-        return -EIO;
-    }
+    //no sleep needed in write
 
     mutex_lock(&tablet_mutex);
     event_buffer = event;
+    //increment to wake up reader
+    data_instance++;
     mutex_unlock(&tablet_mutex);
 
     wake_up_interruptible(&read_queue);
@@ -158,27 +153,16 @@ int cdev_buffer_write(struct tablet_event *event) {
 EXPORT_SYMBOL(cdev_buffer_write);
 
 int cdev_buffer_read(struct tablet_event *event) {
-    if (buf_count == 0) {
-        return -1;
-    }
 
     mutex_lock(&tablet_mutex);
     *event = event_buffer;
     mutex_unlock(&tablet_mutex);
-
-    wake_up_interruptible(&write_queue);
 
     return 0;
 }
 EXPORT_SYMBOL(cdev_buffer_read);
 
 int tablet_cdev_init(void) {
-
-    // Initialise buffer
-        buf_head = 0;
-        buf_tail = 0;
-        buf_count = 0;
-        printk(KERN_INFO "tablet: buffer initialised\n");
 
     // Registers driver with kernel as character device
     major_number = register_chrdev(0, DEVICE_NAME, &fops);
