@@ -62,6 +62,8 @@ void update_pen_data(unsigned char* buf, unsigned int length, struct tablet_even
 
     tablet_data->pen_in_range = buf[1] != 0xc0;
 
+    tablet_data->pen_touching = (buf[1] & 0x01);
+
     if (buf[1] & 2) {
         tablet_data->pen_button = 1;
     } else if (buf[1] & 4) {

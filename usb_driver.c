@@ -24,6 +24,8 @@ static const struct usb_device_id tablet_table[] = {
 
 MODULE_DEVICE_TABLE(usb, tablet_table);
 
+int quadrant_mode = 0; // 0 = off, 1 = on
+
 static void tablet_irq_callback(struct urb *urb)
 {
 	struct tablet_usb_dev *dev = urb->context;
@@ -177,8 +179,12 @@ void handle_button_input(struct tablet_usb_dev *dev) {
 void handle_pen_input(struct tablet_usb_dev *dev) {
 
 	update_pen_data(dev->buf, dev->urb->actual_length, dev->tablet_data);
-	// Report pen coordinates
-	cursor_control_reporting(dev, *tablet_data, dev->tablet_data->pen_in_range);
+
+	if (!quadrant_mode) {
+		cursor_control_reporting(dev, *dev->tablet_data, dev->tablet_data->pen_in_range);
+	} else {
+		quadrant_mode_reporting(dev, *dev->tablet_data, dev->tablet_data->pen_in_range);
+	}
 	
 }
     

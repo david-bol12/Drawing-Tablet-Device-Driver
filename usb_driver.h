@@ -26,6 +26,7 @@ struct tablet_usb_dev {
     struct tablet_event *tablet_data;
     struct tablet_settings *tablet_settings;
     struct input_dev *pen_input_dev;
+    int pen_was_touching;
     char phys[64];
     struct input_dev *button_input_dev;
 };

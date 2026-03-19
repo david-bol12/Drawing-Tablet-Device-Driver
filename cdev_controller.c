@@ -8,8 +8,7 @@
 #include <linux/uaccess.h>
 #include "tablet.h"
 #include "cdev_controller.h"
-#include "ioctl.h"
-#include "../../../usr/src/linux-headers-6.17.0-14-generic/include/uapi/linux/input-event-codes.h"
+#include "proc_file_controller.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Team 12");
@@ -23,22 +22,24 @@ static struct class *tablet_class;
 static struct device *tablet_device;
 
 // tracks how many processes have the device open
-static int open_count = 0;
+ int open_count = 0;
 
 static long data_instance = 0;
 
-// Circular buffer
-static struct tablet_event event_buffer;
-static int buf_head = 0;
-static int buf_tail = 0;
-static int buf_count = 0;
+// Event slot
+struct tablet_event event_buffer;
+
 
 // Initiialise mutex for buffer
-static DEFINE_MUTEX(tablet_mutex);
+DEFINE_MUTEX(tablet_mutex);
 
-// Initialise wait queue - processes sleep here when buffer is empty
+// Initialise wait queue - processes waiting for a new data_instance
 static DECLARE_WAIT_QUEUE_HEAD(read_queue);
-static DECLARE_WAIT_QUEUE_HEAD(write_queue);
+
+static int cdev_open(struct inode *inode, struct file *file);
+static int cdev_release(struct inode *inode, struct file *file);
+static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count, loff_t *offset);
+static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset);
 
 static struct file_operations fops = {
     .owner = THIS_MODULE,
@@ -46,12 +47,16 @@ static struct file_operations fops = {
     .release = cdev_release,
     .read = cdev_read,
     .write = cdev_write,
-    .unlocked_ioctl = tablet_ioctl,
 };
+
+//for proc/ file
+int total_reads = 0;
+int total_writes = 0;
+
 
 // A struct that contains unique data for each instance that is reading from the cdev
 
-static struct reader_data {
+struct reader_data {
     unsigned long instance_no;
 };
 
@@ -63,8 +68,6 @@ static int cdev_open(struct inode *inode, struct file *file) {
     file->private_data = reader_data;
 
     printk(KERN_INFO "tablet: device opened (open count: %d)\n", open_count);
-
-    wake_up_interruptible(&read_queue);
     return 0;
 
 }
@@ -74,7 +77,6 @@ static int cdev_release(struct inode *inode, struct file *file) {
     // wake up sleeping readers so they don't sleep forever
     if (open_count == 0) {
         wake_up_interruptible(&read_queue);
-        wake_up_interruptible(&write_queue);
     }
 
     kfree(file->private_data);
@@ -99,12 +101,13 @@ static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count,
         return -ERESTARTSYS;
     }
 
+
     mutex_lock(&tablet_mutex);
     event = event_buffer;
     reader_data->instance_no = data_instance;
+    total_reads++;
     mutex_unlock(&tablet_mutex);
 
-    wake_up_interruptible(&write_queue);
 
     if (copy_to_user(user_buf, &event, sizeof(event))) {
         return -EFAULT;
@@ -112,8 +115,6 @@ static ssize_t cdev_read(struct file *file, char __user *user_buf, size_t count,
 
     return sizeof(event);
 }
-
-//TODO: Fix cdev write. Currently not working
 
 
 static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t count, loff_t *offset) {
@@ -130,16 +131,12 @@ static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t
         return -EFAULT;
     }
 
-    if (wait_event_interruptible(write_queue, buf_count || open_count == 0)) {
-        return -ERESTARTSYS;
-    }
-
-    if (open_count == 0) {
-        return -EIO;
-    }
+    //no sleep needed in write
 
     mutex_lock(&tablet_mutex);
     event_buffer = event;
+    //increment to wake up reader
+    data_instance++;
     mutex_unlock(&tablet_mutex);
 
     wake_up_interruptible(&read_queue);
@@ -149,26 +146,13 @@ static ssize_t cdev_write(struct file *file, const char __user *user_buf, size_t
     
 }
 
-void cdev_buffer_clear(void) {
-    mutex_lock(&tablet_mutex);
-    memset(&event_buffer, 0, sizeof(event_buffer));
-    data_instance = 0;
-    buf_head = 0;
-    buf_tail = 0;
-    buf_count = 0;
-    mutex_unlock(&tablet_mutex);
-    printk(KERN_INFO "tablet: buffer cleared\n");
-}
-EXPORT_SYMBOL(cdev_buffer_clear);
-
 int cdev_buffer_write(struct tablet_event *event) {
 
     mutex_lock(&tablet_mutex);
     event_buffer = *event;
     data_instance++;
+    total_writes++;
     mutex_unlock(&tablet_mutex);
-
-    pr_err("X: %d", event->x);
 
     wake_up_interruptible(&read_queue);
 
@@ -177,27 +161,16 @@ int cdev_buffer_write(struct tablet_event *event) {
 EXPORT_SYMBOL(cdev_buffer_write);
 
 int cdev_buffer_read(struct tablet_event *event) {
-    if (buf_count == 0) {
-        return -1;
-    }
 
     mutex_lock(&tablet_mutex);
     *event = event_buffer;
     mutex_unlock(&tablet_mutex);
 
-    wake_up_interruptible(&write_queue);
-
     return 0;
 }
 EXPORT_SYMBOL(cdev_buffer_read);
 
-int tablet_cdev_init(struct tablet_settings *tablet_settings) {
-
-    // Initialise buffer
-        buf_head = 0;
-        buf_tail = 0;
-        buf_count = 0;
-        printk(KERN_INFO "tablet: buffer initialised\n");
+int tablet_cdev_init(void) {
 
     // Registers driver with kernel as character device
     major_number = register_chrdev(0, DEVICE_NAME, &fops);
@@ -226,40 +199,22 @@ int tablet_cdev_init(struct tablet_settings *tablet_settings) {
     }
     printk(KERN_ALERT "tablet: /dev/tablet created\n");
 
+    if (proc_init() != 0) {
+        device_destroy(tablet_class, MKDEV(major_number, 0));
+        class_destroy(tablet_class);
+        unregister_chrdev(major_number, DEVICE_NAME);
+        return -ENOMEM;
+    }
+
     return 0;
 }
 
 void tablet_cdev_cleanup(void) {
+    proc_exit();
     device_destroy(tablet_class, MKDEV(major_number, 0));
     class_destroy(tablet_class);
     unregister_chrdev(major_number, DEVICE_NAME);
     printk(KERN_ALERT "tablet: /dev/tablet removed\n");
 }
-
-long tablet_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
-    switch (cmd) {
-
-        case TABLET_SET_BINDING:
-            struct button_binding binding;
-            if (copy_from_user(&binding, (void __user *)arg, sizeof(binding)))
-                return -EFAULT;
-            tablet_settings->tab_bindings[binding.button_id -1] = binding;
-            return 0;
-        case TABLET_GET_SETTING:
-            if (copy_to_user((void __user*) arg, tablet_settings, sizeof(struct tablet_settings))) {
-                pr_alert("\n Error \n");
-                return -EFAULT;
-            }
-            return 0;
-
-        case TABLET_CLR_BINDINGS:
-
-            return 0;
-
-        default:
-            return -ENOTTY;
-    }
-}
-
 
 

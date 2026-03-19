@@ -5,6 +5,8 @@
 #define BUTTON_INTERFACE 0
 #define PEN_INTERFACE 1
 
+extern int quadrant_mode;
+
 struct button_array {
     short no_pressed;
     char buttons[7];
@@ -17,6 +19,7 @@ struct tablet_event {
     struct button_array tab_buttons;     // button number 1-10, 0 = no button
     int pen_button;
     int pen_in_range;
+    int pen_touching;
 };
 
 struct button_binding {

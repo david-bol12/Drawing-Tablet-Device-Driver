@@ -13,6 +13,7 @@
 
 void cursor_control_reporting(struct tablet_usb_dev *dev, struct tablet_event tab_data, int pen_in_range);
 void cursor_control_init(struct tablet_usb_dev *dev);
+void quadrant_mode_reporting(struct tablet_usb_dev *dev, struct tablet_event tab_data, int pen_in_range);
 int button_dev_init(struct input_dev *button_input_dev);
 void update_button_states(struct button_array *buttons_pressed, struct input_dev *button_input_dev);
 
