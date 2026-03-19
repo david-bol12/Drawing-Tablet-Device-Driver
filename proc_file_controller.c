@@ -4,6 +4,7 @@
 #include <linux/seq_file.h>
 #include "cdev_controller.h"
 #include "tablet.h"
+#include "proc_file_controller.h"
 
 static struct proc_dir_entry *proc_entry;
 
