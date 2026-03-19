@@ -10,6 +10,6 @@
 extern struct button_binding button_bindings[MAX_BUTTONS];
 extern struct mutex bindings_mutex;
 
-long tablet_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+
 
 #endif

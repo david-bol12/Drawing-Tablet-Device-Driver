@@ -213,32 +213,15 @@ int main(void)
         AddTab(&tb, &tabs[i]);
     }
 
-
-
-    Rectangle button = { 300, 200, 200, 50 };
-
-    bool dropdownOpen = false;
-    int selectedItem = 0;
     GuiSetStyle(DEFAULT, TEXT_SIZE, 20);
 
 
     while (!WindowShouldClose())
     {
-
-
-        // drawTabBindingMenu(80, 120, 1);
-
-
-
-
-
-
-
         BeginDrawing();
         UpdateTabBar(&tb);
         DrawTabBar(&tb);
         ClearBackground(RAYWHITE);
-        // DrawText(TextFormat("Keys: %d", event_buf->x), 100, 200, 30, DARKGRAY);
         EndDrawing();
     }
 

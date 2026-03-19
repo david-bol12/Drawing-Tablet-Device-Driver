@@ -47,6 +47,7 @@ static struct file_operations fops = {
     .release = cdev_release,
     .read = cdev_read,
     .write = cdev_write,
+    .unlocked_ioctl = tablet_ioctl,
 };
 
 //for proc/ file
@@ -215,6 +216,31 @@ void tablet_cdev_cleanup(void) {
     class_destroy(tablet_class);
     unregister_chrdev(major_number, DEVICE_NAME);
     printk(KERN_ALERT "tablet: /dev/tablet removed\n");
+}
+
+long tablet_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
+    switch (cmd) {
+
+        case TABLET_SET_BINDING:
+            struct button_binding binding;
+            if (copy_from_user(&binding, (void __user *)arg, sizeof(binding)))
+                return -EFAULT;
+            tablet_settings->tab_bindings[binding.button_id -1] = binding;
+            return 0;
+        case TABLET_GET_SETTING:
+            if (copy_to_user((void __user*) arg, tablet_settings, sizeof(struct tablet_settings))) {
+                pr_alert("\n Error \n");
+                return -EFAULT;
+            }
+            return 0;
+
+        case TABLET_CLR_BINDINGS:
+
+            return 0;
+
+        default:
+            return -ENOTTY;
+    }
 }
 
 

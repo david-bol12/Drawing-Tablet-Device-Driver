@@ -17,6 +17,7 @@ int tablet_cdev_init(void);
 void tablet_cdev_cleanup(void);
 int cdev_buffer_write(struct tablet_event *event);
 int cdev_buffer_read(struct tablet_event *event);
+long tablet_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 
 #endif //DEVICEDRIVERPROJECT_CDEV_CONTROLLER_H

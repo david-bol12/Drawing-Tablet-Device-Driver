@@ -204,7 +204,7 @@ static int __init device_module_init(void)
 	tablet_settings = kzalloc(sizeof(struct tablet_settings), GFP_KERNEL);
 
 
-	int result = tablet_cdev_init(tablet_settings);
+	int result = tablet_cdev_init();
 
 	if (result != 0) {
 		pr_err("CDEV INIT FAILED");
